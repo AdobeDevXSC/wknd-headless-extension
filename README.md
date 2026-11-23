@@ -65,6 +65,31 @@ For more information on the difference between `aio app run` and `aio app dev`, 
 - `aio app deploy` to build and deploy all actions on Runtime and static files to CDN
 - `aio app undeploy` to undeploy the app
 
+### GitHub Actions production deployment
+
+[Deploy App Builder to PROD](./.github/workflows/deploy_prod.yml) runs on pushes
+to `main` and through the Actions **Run workflow** button. Its deployment job
+uses the GitHub environment named `PROD`. Configure that environment with:
+
+- Secrets: `AIO_RUNTIME_AUTH` and `SERVICE_API_KEY` (the API key used by the
+  `publish-events` action).
+- Variables: `AIO_RUNTIME_NAMESPACE` and `AIO_RUNTIME_APIHOST`
+  (`https://adobeioruntime.net`).
+- Optional variables: `AEM_PUBLISH_HOST` and `PROXY_ALLOWED_ORIGINS` for the
+  proxy's default host and additional allowed origins.
+
+The workflow validates required settings, installs root and frontend
+dependencies, runs unit tests, and builds and deploys all Runtime actions and
+web assets, including the WKND landing page, both apps, and the header extension.
+Deployments are serialized. It uses Runtime credentials directly without
+writing or committing `.env`; an `ENV` secret is not needed.
+
+Deployment does not publish extension registrations to Exchange or change log
+forwarding. Existing BYO extension registrations remain unchanged. Configure
+required reviewers and deployment branch restrictions on `PROD` if production
+deployments need approval. The older stage workflow is now manual-only and
+still requires its separate stage secrets.
+
 ## Config
 
 ### WKND Headless CF Console header extension
