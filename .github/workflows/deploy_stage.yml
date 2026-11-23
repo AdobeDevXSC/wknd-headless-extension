@@ -92,4 +92,4 @@ jobs:
           PROXY_ALLOWED_ORIGINS: ${{ vars.PROXY_ALLOWED_ORIGINS }}
           CI: 'true'
           NEXT_TELEMETRY_DISABLED: '1'
-        run: aio app deploy --no-publish --no-log-forwarding-update
+        run: aio app deploy --extension application --no-publish --no-log-forwarding-update
