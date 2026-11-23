@@ -71,8 +71,10 @@ For more information on the difference between `aio app run` and `aio app dev`, 
 to `main` and through the Actions **Run workflow** button. Its deployment job
 uses the GitHub environment named `PROD`. Configure that environment with:
 
-- Secrets: `AIO_RUNTIME_AUTH` and `SERVICE_API_KEY` (the API key used by the
-  `publish-events` action).
+- Required secret: `AIO_RUNTIME_AUTH`.
+- Optional secret: `SERVICE_API_KEY`, the default API key used by the
+  `publish-events` action. Without it, callers must supply `apiKey` when invoking
+  that action; deployment still proceeds with a warning.
 - Variables: `AIO_RUNTIME_NAMESPACE` and `AIO_RUNTIME_APIHOST`
   (`https://adobeioruntime.net`).
 - Optional variables: `AEM_PUBLISH_HOST` and `PROXY_ALLOWED_ORIGINS` for the

@@ -33,12 +33,15 @@ jobs:
           SERVICE_API_KEY: ${{ secrets.SERVICE_API_KEY }}
         run: |
           node <<'NODE'
-          const required = ['AIO_RUNTIME_AUTH', 'AIO_RUNTIME_NAMESPACE', 'AIO_RUNTIME_APIHOST', 'SERVICE_API_KEY'];
+          const required = ['AIO_RUNTIME_AUTH', 'AIO_RUNTIME_NAMESPACE', 'AIO_RUNTIME_APIHOST'];
           const missing = required.filter((name) => !process.env[name]?.trim());
           for (const name of missing) {
             console.error(`::error::Missing ${name} in the PROD environment.`);
           }
           if (missing.length) process.exit(1);
+          if (!process.env.SERVICE_API_KEY?.trim()) {
+            console.warn('::warning::SERVICE_API_KEY is not configured. Calls to publish-events must supply apiKey.');
+          }
           NODE
       - name: Install dependencies
         run: |
