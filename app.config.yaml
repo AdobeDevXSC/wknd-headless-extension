@@ -1,0 +1,54 @@
+extensions:
+  aem/cf-console-admin/1:
+    $include: src/aem-cf-console-admin-1/ext.config.yaml
+
+application:
+  actions: actions
+  web: landing
+  dist: dist/application
+  hooks:
+    build-static: npm run build:wknd
+  runtimeManifest:
+    packages:
+      aem:
+        license: Apache-2.0
+        actions:
+          generic:
+            function: actions/generic/index.js
+            web: 'yes'
+            runtime: nodejs:22
+            inputs:
+              LOG_LEVEL: debug
+            annotations:
+              require-adobe-auth: true
+              final: true
+          publish-events:
+            function: actions/publish-events/index.js
+            web: 'yes'
+            runtime: nodejs:22
+            inputs:
+              LOG_LEVEL: debug
+              apiKey: $SERVICE_API_KEY
+            annotations:
+              require-adobe-auth: true
+              final: true
+          list-aem-assets:
+            function: actions/list-aem-assets/index.js
+            web: 'yes'
+            runtime: nodejs:22
+            inputs:
+              LOG_LEVEL: debug
+            annotations:
+              require-adobe-auth: true
+              final: true
+          aem-cors-proxy:
+            function: actions/aem-cors-proxy/index.js
+            web: raw
+            runtime: nodejs:22
+            inputs:
+              AEM_HOST: $AEM_PUBLISH_HOST
+              ALLOWED_ORIGINS: $PROXY_ALLOWED_ORIGINS
+            annotations:
+              require-adobe-auth: false
+              web-custom-options: true
+              final: true

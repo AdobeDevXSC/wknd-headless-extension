@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en" class="spectrum spectrum--medium spectrum--light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AEM Assets Folder Selector</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/@spectrum-css/vars/dist/spectrum-global.css">
+  <link rel="stylesheet" href="https://unpkg.com/@spectrum-css/typography/dist/index-vars.css">
+
+  <!--
+    Adobe Asset Selector SDK.
+    Exposes the global `PureJSSelectors` object used to render
+    renderDestinationSelector() and renderAssetSelector().
+    Docs: https://experienceleague.adobe.com/docs/experience-manager-cloud-service/content/assets/manage/asset-selector.html
+  -->
+  <script src="https://experience.adobe.com/solutions/CQ-assets-selectors/static-assets/resources/assets-selectors.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: adobe-clean, 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      color: #2c2c2c;
+      background: #fff;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    .app-header {
+      height: 48px;
+      background: #1473e6;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 20px;
+      color: #fff;
+    }
+    .app-header svg { flex-shrink: 0; }
+    .app-header h1 { font-size: 16px; font-weight: 400; margin: 0; }
+
+    /* ── Config Panel ────────────────────────────────────── */
+    .config-panel {
+      background: #f8f8f8;
+      border-bottom: 1px solid #e1e1e1;
+      padding: 14px 20px;
+    }
+    .config-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 200px;
+    }
+    .field label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #6e6e6e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .field input {
+      height: 32px;
+      padding: 0 10px;
+      border: 1px solid #c0c0c0;
+      border-radius: 4px;
+      font-size: 13px;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .field input:focus {
+      border-color: #1473e6;
+      box-shadow: 0 0 0 2px rgba(20,115,230,0.2);
+    }
+    .field input:disabled { background: #f0f0f0; color: #909090; }
+
+    .btn {
+      height: 32px;
+      padding: 0 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-primary { background: #1473e6; color: #fff; }
+    .btn-primary:hover { background: #0d66d0; }
+    .btn-primary:disabled { background: #aacbf5; cursor: not-allowed; }
+    .btn-secondary { background: #e1e1e1; color: #2c2c2c; }
+    .btn-secondary:hover { background: #d0d0d0; }
+
+    /* ── Status Bar ──────────────────────────────────────── */
+    .status-bar {
+      padding: 8px 20px;
+      font-size: 12px;
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #e1e1e1;
+      color: #6e6e6e;
+      background: #fff;
+    }
+    .status-bar.info  { color: #6e6e6e; }
+    .status-bar.ok    { color: #268e6c; background: #f4fff9; }
+    .status-bar.error { color: #d7373f; background: #fff4f4; }
+    .status-bar.busy  { color: #1473e6; background: #f0f6ff; }
+
+    /* ── Main Layout ─────────────────────────────────────── */
+    .main {
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      height: calc(100vh - 130px); /* header + config + status */
+      overflow: hidden;
+    }
+
+    /* ── Left: Folder Selector ───────────────────────────── */
+    .panel-left {
+      border-right: 1px solid #e1e1e1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-title {
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6e6e6e;
+      background: #fafafa;
+      border-bottom: 1px solid #e1e1e1;
+      flex-shrink: 0;
+    }
+    #selector-mount {
+      flex: 1;
+      overflow: auto;
+      position: relative;
+    }
+    #selector-mount > iframe,
+    #selector-mount > div { width: 100%; height: 100%; }
+
+    .placeholder {
+      padding: 48px 24px;
+      text-align: center;
+      color: #b0b0b0;
+    }
+    .placeholder-icon { font-size: 40px; margin-bottom: 10px; }
+    .placeholder-text { font-size: 13px; line-height: 1.5; }
+
+    /* ── Right: Asset List ───────────────────────────────── */
+    .panel-right {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #fff;
+    }
+    .panel-right-header {
+      padding: 10px 20px;
+      background: #fafafa;
+      border-bottom: 1px solid #e1e1e1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      min-height: 44px;
+    }
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      flex-wrap: wrap;
+    }
+    .breadcrumb-seg { color: #6e6e6e; }
+    .breadcrumb-seg:last-child { color: #2c2c2c; font-weight: 600; }
+    .breadcrumb-sep { color: #c0c0c0; font-size: 11px; margin: 0 1px; }
+    .count-pill {
+      background: #e8f0ff;
+      color: #1473e6;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .table-wrapper { flex: 1; overflow: auto; }
+
+    table.asset-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .asset-table th {
+      padding: 9px 16px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6e6e6e;
+      background: #fafafa;
+      border-bottom: 2px solid #e1e1e1;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .asset-table td {
+      padding: 9px 16px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: middle;
+    }
+    .asset-table tr:hover td { background: #f5f8ff; }
+    .asset-table tr:last-child td { border-bottom: none; }
+
+    .asset-name { font-weight: 500; }
+    .format-tag {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      background: #e8f4ee;
+      color: #268e6c;
+    }
+
+    .state-panel {
+      padding: 64px 24px;
+      text-align: center;
+      color: #b0b0b0;
+    }
+    .state-icon  { font-size: 44px; margin-bottom: 12px; }
+    .state-title { font-size: 15px; font-weight: 600; color: #6e6e6e; margin-bottom: 6px; }
+    .state-desc  { font-size: 12px; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #c0c0c0;
+      border-top-color: #1473e6;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Token Help Tooltip ──────────────────────────────── */
+    .help-text {
+      font-size: 11px;
+      color: #909090;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header class="app-header">
+    <!-- AEM icon -->
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zm0 10h8v8h-8v-8zM3 13h8v8H3v-8z" fill="white" opacity="0.9"/>
+    </svg>
+    <h1>AEM Assets — Folder Selector</h1>
+  </header>
+
+  <!-- ── Config Panel ────────────────────────────────────────── -->
+  <div class="config-panel">
+    <div class="config-row">
+      <div class="field">
+        <label for="input-repo-id">AEM Repository ID</label>
+        <input id="input-repo-id"
+               type="text"
+               placeholder="author-p12345-e67890.adobeaemcloud.com"
+               autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="input-api-key">API Key / Client ID</label>
+        <input id="input-api-key"
+               type="text"
+               placeholder="Your App Builder Client ID"
+               autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="input-token">IMS Bearer Token</label>
+        <input id="input-token"
+               type="password"
+               placeholder="Paste Bearer token (without 'Bearer ')"
+               autocomplete="off" />
+      </div>
+      <button class="btn btn-primary" id="btn-connect" onclick="handleConnect()">
+        Connect
+      </button>
+      <button class="btn btn-secondary" id="btn-reset" onclick="handleReset()" style="display:none">
+        Reset
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Status Bar ──────────────────────────────────────────── -->
+  <div class="status-bar info" id="status-bar">
+    Enter your AEM connection details above and click <strong>Connect</strong> to browse folders.
+  </div>
+
+  <!-- ── Main ────────────────────────────────────────────────── -->
+  <div class="main">
+
+    <!-- Left: Folder selector (Adobe DestinationSelector renders here) -->
+    <div class="panel-left">
+      <div class="panel-title">Folders</div>
+      <div id="selector-mount">
+        <div class="placeholder" id="selector-placeholder">
+          <div class="placeholder-icon">📁</div>
+          <div class="placeholder-text">Connect to AEM<br>to browse folders</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Assets in selected folder -->
+    <div class="panel-right">
+      <div class="panel-right-header">
+        <nav class="breadcrumb" id="breadcrumb" aria-label="Folder path">
+          <span style="color:#b0b0b0; font-size:13px;">No folder selected</span>
+        </nav>
+        <span class="count-pill" id="count-pill" style="display:none"></span>
+      </div>
+
+      <div class="table-wrapper" id="table-wrapper">
+        <!-- idle state -->
+        <div class="state-panel" id="state-idle">
+          <div class="state-icon">🖼️</div>
+          <div class="state-title">No folder selected</div>
+          <div class="state-desc">Browse the folder tree on the left and select a folder<br>to list its assets here.</div>
+        </div>
+
+        <!-- loading state -->
+        <div class="state-panel" id="state-loading" style="display:none">
+          <div class="state-icon"><span class="spinner"></span></div>
+          <div class="state-title">Loading assets…</div>
+        </div>
+
+        <!-- empty state -->
+        <div class="state-panel" id="state-empty" style="display:none">
+          <div class="state-icon">📂</div>
+          <div class="state-title">Folder is empty</div>
+          <div class="state-desc">No assets found in this folder.</div>
+        </div>
+
+        <!-- error state -->
+        <div class="state-panel" id="state-error" style="display:none">
+          <div class="state-icon">⚠️</div>
+          <div class="state-title">Could not load assets</div>
+          <div class="state-desc" id="state-error-msg"></div>
+        </div>
+
+        <!-- asset table -->
+        <table class="asset-table" id="asset-table" style="display:none" aria-label="Assets">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Format</th>
+              <th>Size</th>
+              <th>Last Modified</th>
+            </tr>
+          </thead>
+          <tbody id="asset-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /.main -->
+
+  <script>
+    'use strict'
+
+    // ─── Constants ─────────────────────────────────────────────────────────────
+    // IMS Org ID from .aio project config (37943E1559F897880A495DFB@AdobeOrg)
+    const IMS_ORG = '37943E1559F897880A495DFB@AdobeOrg'
+
+    // ─── State ─────────────────────────────────────────────────────────────────
+    const state = {
+      imsToken:   null,
+      imsOrg:     IMS_ORG,
+      repoId:     null,   // e.g. "author-p12345-e67890.adobeaemcloud.com"
+      apiKey:     null,
+      aemHost:    null,   // full https:// URL derived from repoId
+      listAssetsActionUrl: null
+    }
+
+    // ─── Initialise ────────────────────────────────────────────────────────────
+    ;(async function init () {
+      // 1. Load action config to get the list-aem-assets URL (if already deployed)
+      try {
+        const cfg = await fetch('./src/config.json').then(r => r.json())
+        state.listAssetsActionUrl =
+          cfg['list-aem-assets'] ||
+          cfg['Desktop/list-aem-assets'] ||
+          null
+      } catch (_) { /* action not deployed yet — will fall back to direct AEM API */ }
+
+      // 2. Try to receive IMS credentials from an Adobe Experience Cloud Shell
+      //    parent frame.  The shell sends a postMessage when the child signals
+      //    readiness.  This is the lightweight equivalent of @adobe/exc-app's
+      //    init() for non-bundled pages.
+      if (window.parent !== window) {
+        window.addEventListener('message', onShellMessage)
+        window.parent.postMessage({ type: 'COM.ADOBE.EXC.APP.READY' }, '*')
+
+        // Give the shell 2 s to respond; keep the form available as fallback
+        setTimeout(() => {
+          window.removeEventListener('message', onShellMessage)
+        }, 2000)
+      }
+    })()
+
+    function onShellMessage (event) {
+      const d = event.data || {}
+      // EXC Shell sends credentials in the READY_V2 / imsInfo messages
+      if (d.imsToken) {
+        state.imsToken = d.imsToken
+        state.imsOrg   = d.imsOrg || IMS_ORG
+        const tokenInput = document.getElementById('input-token')
+        tokenInput.value    = '(injected by Experience Cloud Shell)'
+        tokenInput.disabled = true
+        setStatus('Authenticated via Adobe Experience Cloud Shell. Enter the AEM Repository ID and click Connect.', 'ok')
+        window.removeEventListener('message', onShellMessage)
+      }
+    }
+
+    // ─── UI helpers ────────────────────────────────────────────────────────────
+    function setStatus (html, type = 'info') {
+      const el = document.getElementById('status-bar')
+      el.innerHTML = html
+      el.className = `status-bar ${type}`
+    }
+
+    function showState (name) {
+      // name: 'idle' | 'loading' | 'empty' | 'error' | 'table'
+      for (const id of ['state-idle', 'state-loading', 'state-empty', 'state-error', 'asset-table']) {
+        document.getElementById(id).style.display = 'none'
+      }
+      const target = name === 'table' ? 'asset-table' : `state-${name}`
+      document.getElementById(target).style.display = ''
+    }
+
+    function renderBreadcrumb (path) {
+      const segs = path.split('/').filter(Boolean)
+      const el   = document.getElementById('breadcrumb')
+      el.innerHTML = segs
+        .map((s, i) => {
+          const isLast = i === segs.length - 1
+          return `<span class="breadcrumb-seg">${esc(s)}</span>` +
+                 (isLast ? '' : '<span class="breadcrumb-sep">›</span>')
+        })
+        .join('')
+    }
+
+    // ─── Connect ───────────────────────────────────────────────────────────────
+    function handleConnect () {
+      const repoId   = document.getElementById('input-repo-id').value.trim()
+      const apiKey   = document.getElementById('input-api-key').value.trim()
+      const tokenRaw = document.getElementById('input-token').value.trim()
+
+      if (!repoId) {
+        setStatus('⚠ Please enter the <strong>AEM Repository ID</strong> (e.g. <em>author-p12345-e67890.adobeaemcloud.com</em>).', 'error')
+        return
+      }
+      if (!apiKey) {
+        setStatus('⚠ Please enter your <strong>API Key / Client ID</strong> from the Adobe Developer Console.', 'error')
+        return
+      }
+
+      // Token: prefer the one injected by the shell; otherwise use the input
+      if (tokenRaw && !tokenRaw.startsWith('(injected')) {
+        state.imsToken = tokenRaw.replace(/^Bearer\s+/i, '')
+      }
+      if (!state.imsToken) {
+        setStatus('⚠ No IMS token found. Paste a <strong>Bearer token</strong> in the field above, or open this page inside the Adobe Experience Cloud Shell.', 'error')
+        return
+      }
+
+      state.repoId  = repoId.replace(/^https?:\/\//, '')
+      state.apiKey  = apiKey
+      state.aemHost = 'https://' + state.repoId
+
+      document.getElementById('btn-connect').disabled = true
+      document.getElementById('btn-reset').style.display = ''
+      setStatus('<span class="spinner"></span>&nbsp; Connecting to AEM…', 'busy')
+
+      mountDestinationSelector()
+    }
+
+    function handleReset () {
+      // Unmount the selector
+      const mount = document.getElementById('selector-mount')
+      mount.innerHTML = `
+        <div class="placeholder" id="selector-placeholder">
+          <div class="placeholder-icon">📁</div>
+          <div class="placeholder-text">Connect to AEM<br>to browse folders</div>
+        </div>`
+
+      // Reset inputs
+      document.getElementById('input-repo-id').value = ''
+      document.getElementById('input-api-key').value = ''
+      if (!document.getElementById('input-token').disabled) {
+        document.getElementById('input-token').value = ''
+      }
+      document.getElementById('btn-connect').disabled = false
+      document.getElementById('btn-reset').style.display = 'none'
+
+      // Reset asset panel
+      document.getElementById('breadcrumb').innerHTML =
+        '<span style="color:#b0b0b0;font-size:13px;">No folder selected</span>'
+      document.getElementById('count-pill').style.display = 'none'
+      showState('idle')
+      setStatus('Enter your AEM connection details above and click <strong>Connect</strong> to browse folders.', 'info')
+    }
+
+    // ─── Adobe DestinationSelector ─────────────────────────────────────────────
+    /**
+     * Mounts the Adobe DestinationSelector inside #selector-mount.
+     *
+     * PureJSSelectors is exposed by the CDN script loaded in <head>.
+     * API reference:
+     * https://experienceleague.adobe.com/docs/experience-manager-cloud-service/
+     *   content/assets/manage/asset-selector.html
+     */
+    function mountDestinationSelector () {
+      if (typeof PureJSSelectors === 'undefined') {
+        setStatus('⚠ Adobe Asset Selector SDK failed to load. Check network connectivity.', 'error')
+        document.getElementById('btn-connect').disabled = false
+        return
+      }
+
+      const mount = document.getElementById('selector-mount')
+      mount.innerHTML = '' // clear placeholder
+
+      PureJSSelectors.renderDestinationSelector(
+        mount,
+        {
+          // Auth
+          imsOrg:       state.imsOrg,
+          imsToken:     state.imsToken,
+          apiKey:       state.apiKey,
+
+          // Target AEM environment (author hostname, no scheme)
+          repositoryId: state.repoId,
+
+          // UX
+          selectionType: 'single',
+
+          // Callbacks
+          onConfirm: (selectedFolders) => onFolderConfirmed(selectedFolders),
+          onClose:   ()                 => setStatus('Folder selection cancelled.', 'info')
+        },
+        // SDK ready callback
+        () => {
+          setStatus('Connected. Browse the folder tree and click <strong>Select</strong> to choose a folder.', 'ok')
+        }
+      )
+    }
+
+    // ─── Folder confirmed ──────────────────────────────────────────────────────
+    async function onFolderConfirmed (selectedFolders) {
+      if (!selectedFolders || selectedFolders.length === 0) return
+
+      const folder = selectedFolders[0]
+
+      // The selected folder object may use different property names depending on
+      // the SDK version; normalise here.
+      const folderPath = folder.path       ||
+                         folder['repo:path'] ||
+                         folder.id          ||
+                         ''
+      const folderName = folder.name          ||
+                         folder['repo:name']   ||
+                         folderPath.split('/').pop() ||
+                         'Folder'
+
+      if (!folderPath) {
+        setStatus('⚠ Selected folder has no resolvable path.', 'error')
+        return
+      }
+
+      renderBreadcrumb(folderPath)
+      document.getElementById('count-pill').style.display = 'none'
+      showState('loading')
+      setStatus(`<span class="spinner"></span>&nbsp; Loading assets in <strong>${esc(folderName)}</strong>…`, 'busy')
+
+      try {
+        const assets = await loadAssets(folderPath)
+
+        if (assets.length === 0) {
+          showState('empty')
+          setStatus(`Folder <strong>${esc(folderName)}</strong> has no assets.`, 'info')
+          return
+        }
+
+        renderAssetTable(assets)
+        showState('table')
+
+        const pill = document.getElementById('count-pill')
+        pill.textContent = `${assets.length} asset${assets.length !== 1 ? 's' : ''}`
+        pill.style.display = ''
+
+        setStatus(`Showing <strong>${assets.length}</strong> asset${assets.length !== 1 ? 's' : ''} in <strong>${esc(folderName)}</strong>.`, 'ok')
+      } catch (err) {
+        document.getElementById('state-error-msg').textContent = err.message
+        showState('error')
+        setStatus(`⚠ Failed to load assets: ${esc(err.message)}`, 'error')
+      }
+    }
+
+    // ─── Asset loading ─────────────────────────────────────────────────────────
+    /**
+     * Loads assets for the given folder path.
+     *
+     * Strategy:
+     *   1. If the `list-aem-assets` App Builder action is deployed, route
+     *      through it (avoids browser CORS restrictions on the AEM author API).
+     *   2. Otherwise fall back to a direct AEM Assets HTTP API call.
+     *      Requires the AEM instance to allow CORS from this origin.
+     */
+    async function loadAssets (folderPath) {
+      const headers = {
+        'Content-Type':    'application/json',
+        'Authorization':   `Bearer ${state.imsToken}`,
+        'x-gw-ims-org-id': state.imsOrg
+      }
+
+      // ── Route A: App Builder action (preferred) ────────────────────────────
+      if (state.listAssetsActionUrl) {
+        const res = await fetch(state.listAssetsActionUrl, {
+          method:  'POST',
+          headers,
+          body:    JSON.stringify({ aemHost: state.aemHost, folderPath })
+        })
+        if (!res.ok) {
+          const msg = await res.text().catch(() => res.statusText)
+          throw new Error(`Action responded with ${res.status}: ${msg}`)
+        }
+        const body = await res.json()
+        return body.assets || []
+      }
+
+      // ── Route B: Direct AEM Assets HTTP API ───────────────────────────────
+      const apiPath = folderPath.replace(/^\//, '')
+      const url     = `${state.aemHost}/api/assets/${apiPath}.json?limit=100`
+      const res     = await fetch(url, { headers: { Authorization: `Bearer ${state.imsToken}` } })
+      if (!res.ok) throw new Error(`AEM API responded with ${res.status}: ${res.statusText}`)
+
+      const data     = await res.json()
+      const entities = data.entities || []
+      return entities
+        .filter(e => Array.isArray(e.class) && e.class.includes('assets/asset'))
+        .map(a => ({
+          name:         a.properties?.name             || '',
+          format:       a.properties?.['dc:format']    || '',
+          size:         a.properties?.['dam:size']      || 0,
+          lastModified: a.properties?.['dam:assetLastModified'] || null
+        }))
+    }
+
+    // ─── Render asset table ────────────────────────────────────────────────────
+    function renderAssetTable (assets) {
+      document.getElementById('asset-tbody').innerHTML = assets
+        .map(a => `
+          <tr>
+            <td class="asset-name">${esc(a.name || '—')}</td>
+            <td><span class="format-tag">${esc(friendlyMime(a.format))}</span></td>
+            <td>${friendlySize(a.size)}</td>
+            <td>${friendlyDate(a.lastModified)}</td>
+          </tr>`)
+        .join('')
+    }
+
+    // ─── Formatters ────────────────────────────────────────────────────────────
+    const MIME_LABELS = {
+      'image/jpeg': 'JPEG', 'image/jpg': 'JPEG', 'image/png': 'PNG',
+      'image/gif': 'GIF', 'image/svg+xml': 'SVG', 'image/webp': 'WebP',
+      'image/tiff': 'TIFF', 'image/bmp': 'BMP',
+      'application/pdf': 'PDF',
+      'video/mp4': 'MP4', 'video/quicktime': 'MOV', 'video/mpeg': 'MPEG',
+      'audio/mpeg': 'MP3', 'audio/wav': 'WAV',
+      'application/zip': 'ZIP',
+      'application/msword': 'DOC',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX'
+    }
+
+    function friendlyMime (mime) {
+      if (!mime) return '—'
+      return MIME_LABELS[mime] || mime.split('/').pop().toUpperCase()
+    }
+
+    function friendlySize (bytes) {
+      if (!bytes) return '—'
+      if (bytes < 1024)           return `${bytes} B`
+      if (bytes < 1024 * 1024)    return `${(bytes / 1024).toFixed(1)} KB`
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    }
+
+    function friendlyDate (ts) {
+      if (!ts) return '—'
+      return new Date(ts).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    }
+
+    function esc (str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    }
+  </script>
+</body>
+</html>
