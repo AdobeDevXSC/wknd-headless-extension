@@ -16,6 +16,8 @@ npm run deploy:wknd
 
 Open [the hosted landing page](https://102588-424goldmagpie.adobeio-static.net/index.html)
 to configure AEM, then open either app card in the same tab.
+The landing headline shows `(STAGE)` or `(PROD)` based on the current demo
+hostname, and `(LOCAL / UNKNOWN)` for other hosts.
 The shared landing source is [landing/index.html](./landing/index.html), the
 combined build is [scripts/build-wknd.cjs](./scripts/build-wknd.cjs), and
 generated CDN assets are in `dist/application/web-prod/`. The root

@@ -50,7 +50,7 @@
 </head>
 <body>
 <main>
-  <h1>WKND Headless Demos</h1>
+  <h1 id="demo-title">WKND Headless Demos</h1>
   <p class="lead">React and Next.js apps hosted on Adobe App Builder.</p>
   <div class="cards">
     <a class="card" href="next-js/">
@@ -104,6 +104,11 @@
 </main>
 <script>
   (function () {
+    const environment =
+      location.hostname === "102588-424goldmagpie-stage.adobeio-static.net" ? "STAGE" :
+      location.hostname === "102588-424goldmagpie.adobeio-static.net" ? "PROD" :
+      "LOCAL / UNKNOWN";
+    document.getElementById("demo-title").textContent = `WKND Headless Demos (${environment})`;
     const form = document.getElementById("settings-form");
     const status = document.getElementById("settings-status");
     const rootPath = new URL(".", location.href).pathname;
