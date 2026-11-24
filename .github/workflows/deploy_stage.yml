@@ -25,7 +25,7 @@ jobs:
       - name: Validate deployment configuration
         env:
           AIO_RUNTIME_AUTH: ${{ secrets.AIO_RUNTIME_AUTH }}
-          AIO_RUNTIME_NAMESPACE: ${{ vars.RUNTIME_NAMESPACE }}
+          AIO_RUNTIME_NAMESPACE: ${{ vars.AIO_RUNTIME_NAMESPACE }}
           AIO_RUNTIME_APIHOST: ${{ vars.AIO_RUNTIME_APIHOST }}
           SERVICE_API_KEY: ${{ secrets.SERVICE_API_KEY }}
           CLIENTID: ${{ vars.CLIENTID }}
@@ -42,8 +42,7 @@ jobs:
           ];
           const missing = required.filter((name) => !process.env[name]?.trim());
           for (const name of missing) {
-            const setting = name === 'AIO_RUNTIME_NAMESPACE' ? 'RUNTIME_NAMESPACE' : name;
-            console.error(`::error::Missing ${setting} in the STAGE environment.`);
+            console.error(`::error::Missing ${name} in the STAGE environment.`);
           }
           if (missing.length) process.exit(1);
           if (!process.env.SERVICE_API_KEY?.trim()) {
@@ -85,7 +84,7 @@ jobs:
       - name: Build and deploy actions and web assets
         env:
           AIO_RUNTIME_AUTH: ${{ secrets.AIO_RUNTIME_AUTH }}
-          AIO_RUNTIME_NAMESPACE: ${{ vars.RUNTIME_NAMESPACE }}
+          AIO_RUNTIME_NAMESPACE: ${{ vars.AIO_RUNTIME_NAMESPACE }}
           AIO_RUNTIME_APIHOST: ${{ vars.AIO_RUNTIME_APIHOST }}
           SERVICE_API_KEY: ${{ secrets.SERVICE_API_KEY }}
           AEM_PUBLISH_HOST: ${{ vars.AEM_PUBLISH_HOST }}

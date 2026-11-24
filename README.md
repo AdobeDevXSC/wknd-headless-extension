@@ -71,11 +71,12 @@ For more information on the difference between `aio app run` and `aio app dev`, 
 to `main` and through the Actions **Run workflow** button. Its deployment job
 uses the GitHub environment named `PROD`. Configure that environment with:
 
-- Required secret: `AIO_RUNTIME_AUTH`.
+- Required secrets: `AIO_RUNTIME_AUTH` and `CLIENTSECRET`.
 - Optional secret: `SERVICE_API_KEY`, the default API key used by the
   `publish-events` action. Without it, callers must supply `apiKey` when invoking
   that action; deployment still proceeds with a warning.
-- Variables: `AIO_RUNTIME_NAMESPACE` and `AIO_RUNTIME_APIHOST`
+- Required variables: `CLIENTID`, `TECHNICALACCID`, `TECHNICALACCEMAIL`,
+  `IMSORGID`, `SCOPES`, `AIO_RUNTIME_NAMESPACE`, and `AIO_RUNTIME_APIHOST`
   (`https://adobeioruntime.net`).
 - Optional variables: `AEM_PUBLISH_HOST` and `PROXY_ALLOWED_ORIGINS` for the
   proxy's default host and additional allowed origins.
@@ -83,14 +84,49 @@ uses the GitHub environment named `PROD`. Configure that environment with:
 The workflow validates required settings, installs root and frontend
 dependencies, runs unit tests, and builds and deploys all Runtime actions and
 web assets, including the WKND landing page, both apps, and the header extension.
-Deployments are serialized. It uses Runtime credentials directly without
-writing or committing `.env`; an `ENV` secret is not needed.
+Deployments are serialized. It authenticates with Adobe IMS using OAuth
+Server-to-Server and passes Runtime settings through environment variables
+without writing or committing `.env`; an `ENV` secret is not needed.
+
+CLI 11.1.2 deploys through Adobe's IMS-authenticated deployment service, so
+Runtime credentials alone cannot authorize deployment. In Adobe Developer
+Console, add **I/O Management API** to the target App Builder workspace and use
+that workspace's OAuth Server-to-Server credential for the IMS settings above.
+`SCOPES` must contain its granted scopes as a comma-separated string, not a
+JSON array. The authentication step generates a short-lived token; the workflow
+masks it before deployment. See Adobe's
+[CI/CD setup guide](https://developer.adobe.com/app-builder/docs/guides/app_builder_guides/deployment/cicd-using-github-actions)
+for the credential fields and workspace setup.
 
 Deployment does not publish extension registrations to Exchange or change log
 forwarding. Existing BYO extension registrations remain unchanged. Configure
 required reviewers and deployment branch restrictions on `PROD` if production
-deployments need approval. The older stage workflow is now manual-only and
-still requires its separate stage secrets.
+deployments need approval.
+
+Both deployment workflows select `--extension application`. Its combined build
+hook includes the header extension assets alongside both apps. Uploading the
+extension separately afterward would replace the shared CDN contents and remove
+the landing page and frontend apps.
+
+### GitHub Actions stage deployment
+
+[Deploy App Builder to STAGE](./.github/workflows/deploy_stage.yml) runs only
+through the Actions **Run workflow** button and uses the GitHub environment
+named `STAGE`. Configure it using the Adobe Stage workspace's credentials:
+
+- Required secrets: `AIO_RUNTIME_AUTH` and `CLIENTSECRET`.
+- Required variables: `CLIENTID`, `TECHNICALACCID`, `TECHNICALACCEMAIL`,
+  `IMSORGID`, `SCOPES`, `AIO_RUNTIME_NAMESPACE`, and `AIO_RUNTIME_APIHOST`.
+- Optional secret: `SERVICE_API_KEY`.
+- Optional variables: `AEM_PUBLISH_HOST` and `PROXY_ALLOWED_ORIGINS`.
+
+The workflow reads `AIO_RUNTIME_NAMESPACE` directly from the STAGE variables.
+
+This workflow installs dependencies, runs the same tests, and deploys all
+actions and web assets without publishing extension registrations or changing
+log forwarding. Stage and Production have separate deployment queues and
+namespaces; configuring GitHub's `STAGE` environment does not change Adobe's
+CLI environment to `stage` (Adobe's non-production API infrastructure).
 
 ## Config
 

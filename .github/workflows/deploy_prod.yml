@@ -31,9 +31,18 @@ jobs:
           AIO_RUNTIME_NAMESPACE: ${{ vars.AIO_RUNTIME_NAMESPACE }}
           AIO_RUNTIME_APIHOST: ${{ vars.AIO_RUNTIME_APIHOST }}
           SERVICE_API_KEY: ${{ secrets.SERVICE_API_KEY }}
+          CLIENTID: ${{ vars.CLIENTID }}
+          CLIENTSECRET: ${{ secrets.CLIENTSECRET }}
+          TECHNICALACCID: ${{ vars.TECHNICALACCID }}
+          TECHNICALACCEMAIL: ${{ vars.TECHNICALACCEMAIL }}
+          IMSORGID: ${{ vars.IMSORGID }}
+          SCOPES: ${{ vars.SCOPES }}
         run: |
           node <<'NODE'
-          const required = ['AIO_RUNTIME_AUTH', 'AIO_RUNTIME_NAMESPACE', 'AIO_RUNTIME_APIHOST'];
+          const required = [
+            'AIO_RUNTIME_AUTH', 'AIO_RUNTIME_NAMESPACE', 'AIO_RUNTIME_APIHOST',
+            'CLIENTID', 'CLIENTSECRET', 'TECHNICALACCID', 'TECHNICALACCEMAIL', 'IMSORGID', 'SCOPES',
+          ];
           const missing = required.filter((name) => !process.env[name]?.trim());
           for (const name of missing) {
             console.error(`::error::Missing ${name} in the PROD environment.`);
@@ -57,6 +66,24 @@ jobs:
         run: |
           npm test -- --runInBand
           npm run test:wknd
+      - name: Authenticate with Adobe IMS
+        uses: adobe/aio-apps-action@3.3.0
+        with:
+          os: ubuntu-latest
+          command: oauth_sts
+          CLIENTID: ${{ vars.CLIENTID }}
+          CLIENTSECRET: ${{ secrets.CLIENTSECRET }}
+          TECHNICALACCOUNTID: ${{ vars.TECHNICALACCID }}
+          TECHNICALACCOUNTEMAIL: ${{ vars.TECHNICALACCEMAIL }}
+          IMSORGID: ${{ vars.IMSORGID }}
+          SCOPES: ${{ vars.SCOPES }}
+      - name: Mask generated IMS token
+        run: |
+          if [ -z "$AIO_IMS_CONTEXTS_CLI_ACCESS__TOKEN_TOKEN" ]; then
+            echo "::error::Adobe IMS authentication did not provide a deployment token."
+            exit 1
+          fi
+          echo "::add-mask::$AIO_IMS_CONTEXTS_CLI_ACCESS__TOKEN_TOKEN"
       - name: Build and deploy actions and web assets
         env:
           AIO_RUNTIME_AUTH: ${{ secrets.AIO_RUNTIME_AUTH }}
@@ -67,4 +94,4 @@ jobs:
           PROXY_ALLOWED_ORIGINS: ${{ vars.PROXY_ALLOWED_ORIGINS }}
           CI: 'true'
           NEXT_TELEMETRY_DISABLED: '1'
-        run: aio app deploy --no-publish --no-log-forwarding-update
+        run: aio app deploy --extension application --no-publish --no-log-forwarding-update
